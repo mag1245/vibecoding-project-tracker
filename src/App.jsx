@@ -11,6 +11,14 @@ const STAGES = [
 const TEAMMATES = ['Teammate A', 'Teammate B', 'Teammate C'];
 const AI_TOOLS = ['Claude', 'ChatGPT', 'Cursor', 'Lovable', 'Replit', 'Other'];
 
+// Initial Deliverable Anchors for Milestone 11[cite: 5, 8]
+const INITIAL_ANCHORS = [
+  { id: 'presentation', label: 'Presentation', url: '' },
+  { id: 'demo', label: 'Demo', url: '' },
+  { id: 'report', label: 'Report', url: '' },
+  { id: 'documentation', label: 'Documentation', url: '' },
+];
+
 const DEFAULT_CONTEXT_TEMPLATE = `### Background
 - 
 
@@ -117,6 +125,7 @@ function timeAgo(dateString) {
 
 export default function App() {
   const [tasks, setTasks] = useLocalStorage('vibecoding_tasks', INITIAL_TASKS);
+  const [anchors, setAnchors] = useLocalStorage('vibecoding_anchors', INITIAL_ANCHORS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -135,6 +144,12 @@ export default function App() {
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleAnchorUrlChange = (id, newUrl) => {
+    setAnchors(
+      anchors.map((a) => (a.id === id ? { ...a, url: newUrl } : a))
+    );
   };
 
   const handleCopyPrompt = (task, e) => {
@@ -280,6 +295,71 @@ ${task.context || 'No context provided.'}`;
         </div>
       </header>
 
+      {/* Deliverable Anchor Board (M11) */}
+      <div className="mb-6 bg-surface-card border border-slate-800 rounded-lg p-4 shadow-sm">
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3 flex items-center justify-between">
+          <span>Project Deliverable Anchors</span>
+          <span className="text-[11px] text-text-muted font-normal lowercase">
+            {anchors.filter((a) => a.url.trim()).length} of 4 linked
+          </span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {anchors.map((anchor) => {
+            const isFilled = Boolean(anchor.url && anchor.url.trim());
+            return (
+              <div
+                key={anchor.id}
+                className={`p-3 rounded-md border flex flex-col justify-between transition ${
+                  isFilled
+                    ? 'bg-emerald-950/20 border-emerald-500/40'
+                    : 'bg-slate-900/50 border-slate-800'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-medium text-text-primary flex items-center gap-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isFilled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
+                      }`}
+                    />
+                    {anchor.label}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                      isFilled
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : 'bg-slate-800 text-text-muted'
+                    }`}
+                  >
+                    {isFilled ? 'LINKED' : 'EMPTY'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="url"
+                    value={anchor.url}
+                    onChange={(e) => handleAnchorUrlChange(anchor.id, e.target.value)}
+                    placeholder="Paste deliverable URL..."
+                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs font-mono text-text-primary focus:outline-none focus:border-brand-primary placeholder:text-slate-600"
+                  />
+                  {isFilled && (
+                    <a
+                      href={anchor.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-primary hover:underline px-1"
+                      title="Open Link"
+                    >
+                      ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Team Ownership Summary Strip */}
       <div className="mb-6 bg-surface-card/70 border border-slate-800 rounded-lg p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
         {TEAMMATES.map((member) => {
@@ -384,7 +464,6 @@ ${task.context || 'No context provided.'}`;
                           )}
                         </div>
 
-                        {/* Card Actions & Copy Context Button (M10) */}
                         <div className="flex flex-col gap-2 mt-3 pt-2 border-t border-slate-800/80 text-[11px]">
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
@@ -435,7 +514,7 @@ ${task.context || 'No context provided.'}`;
         })}
       </div>
 
-      {/* Task Modal with Copy Prompt Button (M10) */}
+      {/* Task Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-surface-card border border-slate-700 rounded-lg max-w-2xl w-full p-6 shadow-xl my-8">

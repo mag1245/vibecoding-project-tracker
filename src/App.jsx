@@ -1,117 +1,119 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-/**
- * Vibecoding Project Tracker — starter scaffold.
- *
- * This file is intentionally almost empty. The boilerplate (Vite, React,
- * Tailwind) is configured for you, plus a few shared constants and a
- * localStorage helper. Everything visible on screen, you build.
- *
- * Where to start (build sequence in Phase 3):
- *   - M4  data-model    : render the four columns and the task cards below.
- *   - M5  crud-modal    : add the "+" button modal and the edit-on-click modal.
- *   - M6  tag-style     : feature vs. bug color coding (uses DESIGN.md §2 colors).
- *   - M7  task-owner    : assignee badge + "Hand off to..." dropdown.
- *   - M8  due-tint      : color cards by due date (uses DESIGN.md §2 due-state colors).
- *   - M9  context       : a curated Context briefing field on the modal.
- *   - M10 copy-prompt   : a "Copy as Prompt Context" button that serializes the task + context.
- *   - M11 anchors       : the Anchor Board above the Kanban.
- *   - M12 secret-sauce  : the one open-ended thing that makes your tracker yours.
- *
- * Search the file for `TODO M<n>` to find the right hook for each milestone.
- */
-
-/**
- * @typedef {Object} Task
- * @property {string} id
- * @property {string} title
- * @property {string} description
- * @property {'feature'|'bug'} type
- * @property {'todo'|'in-progress'|'review'|'done'} status
- * @property {string} assignee
- * @property {string|null} dueDate     ISO 'YYYY-MM-DD'
- * @property {string} createdDate      ISO 'YYYY-MM-DD'
- */
-
-// The four columns of the board, in render order.
-// Use these IDs everywhere — do not invent new ones.
-export const STAGES = [
-  { id: 'todo',        label: 'To Do' },
+// Locked STAGES constant per PRD §7
+const STAGES = [
+  { id: 'todo', label: 'To Do' },
   { id: 'in-progress', label: 'In Progress' },
-  { id: 'review',      label: 'Review' },
-  { id: 'done',        label: 'Done' },
+  { id: 'review', label: 'Review' },
+  { id: 'done', label: 'Done' },
 ];
 
-// Replace these placeholders with the three names from PRD §8 before M4.
-// They become the only valid values for `Task.assignee`.
-export const TEAM = ['Teammate A', 'Teammate B', 'Teammate C'];
-
-/**
- * A tiny localStorage hook — survives reloads, no library needed.
- *
- * Usage:
- *   const [tasks, setTasks] = useLocalStorage('vibetracker.tasks', []);
- */
-export function useLocalStorage(key, initialValue) {
-  const [value, setValue] = useState(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      return raw != null ? JSON.parse(raw) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      /* quota or private-mode error — silently ignore for hackathon */
-    }
-  }, [key, value]);
-
-  return [value, setValue];
-}
+// Initial mock tasks for Milestone 4 data-model
+const INITIAL_TASKS = [
+  {
+    id: '1',
+    title: 'Fix nav alignment',
+    description: 'Ensure header links are responsive on smaller widths.',
+    type: 'bug',
+    status: 'todo',
+    assignee: 'Teammate A',
+    dueDate: '2026-10-25',
+    createdDate: '2026-10-20',
+    context: '',
+    contextTool: null,
+    contextUpdatedAt: null,
+  },
+  {
+    id: '2',
+    title: 'About page layout',
+    description: 'Create clean typography blocks for team description.',
+    type: 'feature',
+    status: 'in-progress',
+    assignee: 'Teammate B',
+    dueDate: '2026-10-26',
+    createdDate: '2026-10-20',
+    context: '',
+    contextTool: null,
+    contextUpdatedAt: null,
+  },
+  {
+    id: '3',
+    title: 'Review PRD details',
+    description: 'Verify all team requirements are fully filled out.',
+    type: 'feature',
+    status: 'review',
+    assignee: 'Teammate C',
+    dueDate: '2026-10-24',
+    createdDate: '2026-10-19',
+    context: '',
+    contextTool: null,
+    contextUpdatedAt: null,
+  },
+];
 
 export default function App() {
-  // TODO M4 data-model:
-  //   const [tasks, setTasks] = useLocalStorage('vibetracker.tasks', [/* 3-4 seed tasks */]);
-  //
-  // TODO M5 crud-modal:
-  //   const [editing, setEditing] = useState(null);
-  //
-  // TODO M11 anchors:
-  //   const [anchors, setAnchors] = useLocalStorage('vibetracker.anchors', [...]);
+  const [tasks] = useState(INITIAL_TASKS);
 
   return (
-    <div className="min-h-screen p-6">
-      <header className="mb-6 flex items-end justify-between">
+    <div className="min-h-screen bg-surface-page text-text-primary p-6 font-sans">
+      {/* Header */}
+      <header className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Vibecoding Project Tracker
-          </h1>
-          <p className="text-sm text-slate-500">
-            {/* Replace this line with your team name from PRD §11. */}
-            Team starter
-          </p>
+          <h1 className="text-2xl font-semibold text-text-primary">Vibecoding Project Tracker</h1>
+          <p className="text-sm text-text-muted">Monitor your projects from intent to ship.</p>
+        </div>
+        <div className="text-xs bg-surface-card px-3 py-1.5 rounded-md border border-slate-700 text-text-muted">
+          Milestone 4: Data Model & Kanban Board Active
         </div>
       </header>
 
-      {/* TODO M11 anchors: render the Anchor Board (Presentation / Demo / Report / Documentation) above the board. */}
+      {/* Kanban Board Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {STAGES.map((stage) => {
+          const columnTasks = tasks.filter((t) => t.status === stage.id);
 
-      {/*
-        TODO M4 data-model:
-          Render a Kanban board with the four columns from STAGES.
-          Each column should display the tasks whose status matches its id.
-          Pre-populate 3-4 mock tasks so the board isn't empty on first load.
+          return (
+            <div key={stage.id} className="bg-surface-card/50 rounded-lg p-4 border border-slate-800 flex flex-col">
+              {/* Column Header */}
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-800/60">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
+                  {stage.label}
+                </h2>
+                <span className="bg-slate-800 text-text-muted text-xs px-2 py-0.5 rounded-full font-mono">
+                  {columnTasks.length}
+                </span>
+              </div>
 
-        TODO M5 crud-modal:
-          Add a "+" button that opens a modal with every Task field.
-          Clicking a card should open the same modal in edit mode.
-      */}
-      <main className="flex h-64 items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-400">
-        Build the four-column board here · M4
-      </main>
+              {/* Tasks List */}
+              <div className="space-y-3 flex-1">
+                {columnTasks.length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-slate-800 rounded-md text-text-muted text-xs">
+                    Nothing here yet — keep vibecoding.
+                  </div>
+                ) : (
+                  columnTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="bg-surface-card p-4 rounded-md border border-slate-700/60 shadow-sm hover:border-slate-600 transition"
+                    >
+                      <div className="flex justify-between items-start mb-1.5">
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase tracking-wide ${
+                          task.type === 'bug' ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
+                        }`}>
+                          {task.type}
+                        </span>
+                        <span className="text-xs text-text-muted font-mono">{task.assignee}</span>
+                      </div>
+                      <h3 className="text-sm font-medium text-text-primary mb-1">{task.title}</h3>
+                      <p className="text-xs text-text-muted line-clamp-2">{task.description}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

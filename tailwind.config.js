@@ -4,9 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Tweak in M6 (tag-style) and M8 (due-tint)
-        feature: '#10B981', // emerald
-        bug: '#DC2626',     // crimson
+        brand: {
+          primary: '#6366F1',
+          accent: '#4F46E5',
+        },
+        surface: {
+          page: '#0F172A',
+          card: '#1E293B',
+        },
+        text: {
+          primary: '#F8FAFC',
+          muted: '#94A3B8',
+        },
+        type: {
+          feature: '#10B981',
+          bug: '#EF4444',
+        },
+        due: {
+          safe: '#334155',
+          warning: '#D97706',
+          overdue: '#DC2626',
+          neutral: '#1E293B',
+        }
       },
     },
   },

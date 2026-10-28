@@ -11,12 +11,11 @@ const STAGES = [
 const TEAMMATES = ['Teammate A', 'Teammate B', 'Teammate C'];
 const AI_TOOLS = ['Claude', 'ChatGPT', 'Cursor', 'Lovable', 'Replit', 'Other'];
 
-// Initial Deliverable Anchors for Milestone 11[cite: 5, 8]
 const INITIAL_ANCHORS = [
-  { id: 'presentation', label: 'Presentation', url: '' },
-  { id: 'demo', label: 'Demo', url: '' },
-  { id: 'report', label: 'Report', url: '' },
-  { id: 'documentation', label: 'Documentation', url: '' },
+  { id: 'presentation', label: 'Presentation', url: 'https://slides.com/demo' },
+  { id: 'demo', label: 'Demo', url: 'https://vercel.app' },
+  { id: 'report', label: 'Report', url: 'https://notion.so/report' },
+  { id: 'documentation', label: 'Documentation', url: 'https://github.com/mag1245/vibecoding-project-tracker' },
 ];
 
 const DEFAULT_CONTEXT_TEMPLATE = `### Background
@@ -31,6 +30,7 @@ const DEFAULT_CONTEXT_TEMPLATE = `### Background
 ### Pick up
 - `;
 
+// Rich demo dataset loaded for pitch-ready (M13)
 const INITIAL_TASKS = [
   {
     id: '1',
@@ -67,9 +67,22 @@ const INITIAL_TASKS = [
     assignee: 'Teammate C',
     dueDate: '2026-11-05',
     createdDate: '2026-10-19',
-    context: '',
-    contextTool: null,
-    contextUpdatedAt: null,
+    context: '### Background\nChecked sections 1 through 8 with Prof Alvarez guidelines.',
+    contextTool: 'ChatGPT',
+    contextUpdatedAt: '2026-10-26T09:15:00.000Z',
+  },
+  {
+    id: '4',
+    title: 'Deploy to Vercel production',
+    description: 'Hook up GitHub repository and verify live deployment URL.',
+    type: 'feature',
+    status: 'done',
+    assignee: 'Teammate A',
+    dueDate: '2026-10-23',
+    createdDate: '2026-10-18',
+    context: '### Background\nOne-click import from Vercel dashboard completed successfully.',
+    contextTool: 'Lovable',
+    contextUpdatedAt: '2026-10-23T16:00:00.000Z',
   },
 ];
 
@@ -126,6 +139,7 @@ function timeAgo(dateString) {
 export default function App() {
   const [tasks, setTasks] = useLocalStorage('vibecoding_tasks', INITIAL_TASKS);
   const [anchors, setAnchors] = useLocalStorage('vibecoding_anchors', INITIAL_ANCHORS);
+  const [searchQuery, setSearchQuery] = useState(''); // Secret Sauce (M12)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -271,6 +285,17 @@ ${task.context || 'No context provided.'}`;
       .toUpperCase();
   };
 
+  // Filter tasks based on search query (Secret Sauce - M12)
+  const filteredTasks = tasks.filter((t) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      t.title.toLowerCase().includes(query) ||
+      t.description.toLowerCase().includes(query) ||
+      t.assignee.toLowerCase().includes(query) ||
+      t.type.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-surface-page text-text-primary p-6 font-sans relative">
       {toastMessage && (
@@ -282,10 +307,32 @@ ${task.context || 'No context provided.'}`;
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 border-b border-slate-800 pb-4 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Vibecoding Project Tracker</h1>
+          <h1 className="text-2xl font-semibold text-text-primary"> Project Tracker</h1>
           <p className="text-sm text-text-muted">Monitor your projects from intent to ship.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Secret Sauce Search Bar (M12) */}
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 text-xs">
+              🔍
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter tasks, assignee..."
+              className="bg-slate-900 border border-slate-700 rounded-md pl-8 pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-brand-primary w-48 sm:w-64"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-xs text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => openCreateModal('todo')}
             className="bg-brand-primary hover:bg-brand-accent text-white px-4 py-2 rounded-md font-medium text-sm transition shadow"
@@ -387,7 +434,7 @@ ${task.context || 'No context provided.'}`;
       {/* Kanban Board Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {STAGES.map((stage) => {
-          const columnTasks = tasks.filter((t) => t.status === stage.id);
+          const columnTasks = filteredTasks.filter((t) => t.status === stage.id);
 
           return (
             <div key={stage.id} className="bg-surface-card/50 rounded-lg p-4 border border-slate-800 flex flex-col">
@@ -412,7 +459,7 @@ ${task.context || 'No context provided.'}`;
               <div className="space-y-3 flex-1">
                 {columnTasks.length === 0 ? (
                   <div className="text-center py-8 border border-dashed border-slate-800 rounded-md text-text-muted text-xs">
-                    Nothing here yet — keep vibecoding.
+                    Nothing here yet.
                   </div>
                 ) : (
                   columnTasks.map((task) => {

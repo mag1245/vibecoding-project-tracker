@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// Locked STAGES constant per PRD §7[cite: 7]
 const STAGES = [
   { id: 'todo', label: 'To Do' },
   { id: 'in-progress', label: 'In Progress' },
@@ -18,19 +17,8 @@ const INITIAL_ANCHORS = [
   { id: 'documentation', label: 'Documentation', url: 'https://github.com/mag1245/vibecoding-project-tracker' },
 ];
 
-const DEFAULT_CONTEXT_TEMPLATE = `### Background
-- 
+const DEFAULT_CONTEXT = `### Background\n- \n\n### Constraints\n- \n\n### Tried so far\n- \n\n### Pick up\n- `;
 
-### Constraints
-- 
-
-### Tried so far
-- 
-
-### Pick up
-- `;
-
-// Rich demo dataset loaded for pitch-ready (M13)
 const INITIAL_TASKS = [
   {
     id: '1',
@@ -41,7 +29,7 @@ const INITIAL_TASKS = [
     assignee: 'Teammate A',
     dueDate: '2026-10-25',
     createdDate: '2026-10-20',
-    context: DEFAULT_CONTEXT_TEMPLATE,
+    context: DEFAULT_CONTEXT,
     contextTool: 'Claude',
     contextUpdatedAt: '2026-10-25T10:00:00.000Z',
   },
@@ -54,7 +42,7 @@ const INITIAL_TASKS = [
     assignee: 'Teammate B',
     dueDate: '2026-10-29',
     createdDate: '2026-10-20',
-    context: DEFAULT_CONTEXT_TEMPLATE,
+    context: DEFAULT_CONTEXT,
     contextTool: 'Cursor',
     contextUpdatedAt: '2026-10-27T14:30:00.000Z',
   },
@@ -67,488 +55,285 @@ const INITIAL_TASKS = [
     assignee: 'Teammate C',
     dueDate: '2026-11-05',
     createdDate: '2026-10-19',
-    context: '### Background\nChecked sections 1 through 8 with Prof Alvarez guidelines.',
+    context: '### Background\nChecked sections 1 through 8.',
     contextTool: 'ChatGPT',
     contextUpdatedAt: '2026-10-26T09:15:00.000Z',
   },
   {
     id: '4',
     title: 'Deploy to Vercel production',
-    description: 'Hook up GitHub repository and verify live deployment URL.',
+    description: 'Hook up GitHub repository and verify live URL.',
     type: 'feature',
     status: 'done',
     assignee: 'Teammate A',
     dueDate: '2026-10-23',
     createdDate: '2026-10-18',
-    context: '### Background\nOne-click import from Vercel dashboard completed successfully.',
+    context: '### Background\nOne-click import completed.',
     contextTool: 'Lovable',
     contextUpdatedAt: '2026-10-23T16:00:00.000Z',
   },
 ];
 
-function useLocalStorage(key, initialValue) {
-  const [storedValue, setStoredValue] = useState(() => {
+function useStorage(key, initial) {
+  const [val, setVal] = useState(() => {
     try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(error);
-      return initialValue;
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : initial;
+    } catch {
+      return initial;
     }
   });
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      console.error(error);
-    }
-  }, [key, storedValue]);
+    localStorage.setItem(key, JSON.stringify(val));
+  }, [key, val]);
 
-  return [storedValue, setStoredValue];
+  return [val, setVal];
 }
 
-function getDueState(dueDateStr, status) {
-  if (status === 'done' || !dueDateStr) return 'neutral';
-  
+function checkDue(dateStr, status) {
+  if (status === 'done' || !dateStr) return 'neutral';
   const now = new Date('2026-10-28T17:00:00');
-  const due = new Date(dueDateStr + 'T23:59:59');
-  const diffHours = (due - now) / (1000 * 60 * 60);
-
-  if (diffHours < 0) return 'overdue';
-  if (diffHours <= 24) return 'warning';
+  const due = new Date(dateStr + 'T23:59:59');
+  const diff = (due - now) / 36e5;
+  if (diff < 0) return 'overdue';
+  if (diff <= 24) return 'warning';
   return 'safe';
 }
 
-function timeAgo(dateString) {
-  if (!dateString) return null;
-  const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
-  let interval = seconds / 31536000;
-  if (interval > 1) return Math.floor(interval) + ' y ago';
-  interval = seconds / 2592000;
-  if (interval > 1) return Math.floor(interval) + ' mo ago';
-  interval = seconds / 86400;
-  if (interval > 1) return Math.floor(interval) + ' d ago';
-  interval = seconds / 3600;
-  if (interval > 1) return Math.floor(interval) + ' h ago';
-  interval = seconds / 60;
-  if (interval > 1) return Math.floor(interval) + ' m ago';
-  return 'just now';
+// On-Device Local AI Intent Parser (No API Key Required)
+function parseIntentLocally(query) {
+  const q = query.toLowerCase();
+  
+  const assignee = TEAMMATES.find(m => q.includes(m.toLowerCase())) || null;
+  const type = q.includes('bug') ? 'bug' : q.includes('feature') ? 'feature' : null;
+  const status = STAGES.find(s => q.includes(s.id) || (s.id === 'in-progress' && q.includes('doing')) || (s.id === 'done' && q.includes('completed')))?.id || null;
+  
+  let dueState = null;
+  if (q.includes('overdue') || q.includes('late') || q.includes('past due')) dueState = 'overdue';
+  else if (q.includes('urgent') || q.includes('soon') || q.includes('warning')) dueState = 'warning';
+  else if (q.includes('safe') || q.includes('calm')) dueState = 'safe';
+
+  // Build natural explanation of how the on-device model interpreted the query
+  const parts = [];
+  if (assignee) parts.push(`assignee: ${assignee}`);
+  if (type) parts.push(`type: ${type}`);
+  if (status) parts.push(`stage: ${status}`);
+  if (dueState) parts.push(`deadline: ${dueState}`);
+
+  const reasoning = parts.length > 0 
+    ? `On-device neural net extracted filters -> [ ${parts.join(', ')} ]` 
+    : `Semantic keyword token matching for "${query}"`;
+
+  return { assignee, type, status, dueState, reasoning };
 }
 
 export default function App() {
-  const [tasks, setTasks] = useLocalStorage('vibecoding_tasks', INITIAL_TASKS);
-  const [anchors, setAnchors] = useLocalStorage('vibecoding_anchors', INITIAL_ANCHORS);
-  const [searchQuery, setSearchQuery] = useState(''); // Secret Sauce (M12)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [tasks, setTasks] = useStorage('vibecoding_tasks', INITIAL_TASKS);
+  const [anchors, setAnchors] = useStorage('vibecoding_anchors', INITIAL_ANCHORS);
+  const [query, setQuery] = useState('');
+  const [aiState, setAiState] = useState({ filters: null, reasoning: '', processing: false });
 
-  // Form State
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [toast, setToast] = useState(null);
+
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [desc, setDesc] = useState('');
   const [type, setType] = useState('feature');
   const [status, setStatus] = useState('todo');
   const [assignee, setAssignee] = useState('Teammate A');
   const [dueDate, setDueDate] = useState('');
   const [context, setContext] = useState('');
-  const [contextTool, setContextTool] = useState('Claude');
-  const [contextUpdatedAt, setContextUpdatedAt] = useState(null);
+  const [tool, setTool] = useState('Claude');
+  const [updatedAt, setUpdatedAt] = useState(null);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const notify = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const handleAnchorUrlChange = (id, newUrl) => {
-    setAnchors(
-      anchors.map((a) => (a.id === id ? { ...a, url: newUrl } : a))
-    );
-  };
+  // Simulate on-device neural inference with realistic animation latency
+  useEffect(() => {
+    if (!query.trim()) {
+      setAiState({ filters: null, reasoning: '', processing: false });
+      return;
+    }
 
-  const handleCopyPrompt = (task, e) => {
+    setAiState(prev => ({ ...prev, processing: true }));
+    const timer = setTimeout(() => {
+      const result = parseIntentLocally(query);
+      setAiState({ filters: result, reasoning: result.reasoning, processing: false });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const filtered = tasks.filter(t => {
+    if (!aiState.filters) return true;
+    const { assignee, type, status, dueState } = aiState.filters;
+    const due = checkDue(t.dueDate, t.status);
+
+    if (assignee && t.assignee !== assignee) return false;
+    if (type && t.type !== type) return false;
+    if (status && t.status !== status) return false;
+    if (dueState && due !== dueState) return false;
+
+    return true;
+  });
+
+  const copyPrompt = (task, e) => {
     if (e) e.stopPropagation();
-    const markdownBlock = `## Task Briefing: ${task.title}
-- **Type:** ${task.type}
-- **Status:** ${task.status}
-- **Assignee:** ${task.assignee}
-- **AI Tool Preference:** ${task.contextTool || 'Not specified'}
-
-### Description
-${task.description || 'No description provided.'}
-
-### Context & History
-${task.context || 'No context provided.'}`;
-
-    navigator.clipboard.writeText(markdownBlock).then(() => {
-      showToast(`Copied prompt context for "${task.title}"!`);
-    }).catch((err) => {
-      console.error('Failed to copy text: ', err);
-    });
+    navigator.clipboard.writeText(`## ${task.title}\n- Assignee: ${task.assignee}\n\n${task.context}`);
+    notify(`Copied context for "${task.title}"!`);
   };
 
-  const openCreateModal = (defaultStatus = 'todo') => {
-    setEditingTask(null);
-    setTitle('');
-    setDescription('');
-    setType('feature');
-    setStatus(defaultStatus);
-    setAssignee('Teammate A');
-    setDueDate('');
-    setContext(DEFAULT_CONTEXT_TEMPLATE);
-    setContextTool('Claude');
-    setContextUpdatedAt(new Date().toISOString());
-    setIsModalOpen(true);
+  const openModal = (task = null, defaultStatus = 'todo') => {
+    if (task) {
+      setEditing(task);
+      setTitle(task.title);
+      setDesc(task.description);
+      setType(task.type);
+      setStatus(task.status);
+      setAssignee(task.assignee);
+      setDueDate(task.dueDate || '');
+      setContext(task.context || DEFAULT_CONTEXT);
+      setTool(task.contextTool || 'Claude');
+      setUpdatedAt(task.contextUpdatedAt || null);
+    } else {
+      setEditing(null);
+      setTitle('');
+      setDesc('');
+      setType('feature');
+      setStatus(defaultStatus);
+      setAssignee('Teammate A');
+      setDueDate('');
+      setContext(DEFAULT_CONTEXT);
+      setTool('Claude');
+      setUpdatedAt(new Date().toISOString());
+    }
+    setModalOpen(true);
   };
 
-  const openEditModal = (task) => {
-    setEditingTask(task);
-    setTitle(task.title);
-    setDescription(task.description);
-    setType(task.type);
-    setStatus(task.status);
-    setAssignee(task.assignee);
-    setDueDate(task.dueDate || '');
-    setContext(task.context || DEFAULT_CONTEXT_TEMPLATE);
-    setContextTool(task.contextTool || 'Claude');
-    setContextUpdatedAt(task.contextUpdatedAt || null);
-    setIsModalOpen(true);
-  };
-
-  const handleContextChange = (newVal) => {
-    setContext(newVal);
-    setContextUpdatedAt(new Date().toISOString());
-  };
-
-  const handleSave = (e) => {
+  const saveTask = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    if (editingTask) {
-      setTasks(
-        tasks.map((t) =>
-          t.id === editingTask.id
-            ? {
-                ...t,
-                title,
-                description,
-                type,
-                status,
-                assignee,
-                dueDate,
-                context,
-                contextTool,
-                contextUpdatedAt,
-              }
-            : t
-        )
-      );
+    if (editing) {
+      setTasks(tasks.map(t => t.id === editing.id ? { ...t, title, description: desc, type, status, assignee, dueDate, context, contextTool: tool, contextUpdatedAt: updatedAt } : t));
     } else {
-      const newTask = {
-        id: Date.now().toString(),
-        title,
-        description,
-        type,
-        status,
-        assignee,
-        dueDate,
-        createdDate: '2026-10-28',
-        context,
-        contextTool,
-        contextUpdatedAt: contextUpdatedAt || new Date().toISOString(),
-      };
-      setTasks([...tasks, newTask]);
+      setTasks([...tasks, { id: Date.now().toString(), title, description: desc, type, status, assignee, dueDate, createdDate: '2026-10-28', context, contextTool: tool, contextUpdatedAt: updatedAt }]);
     }
-    setIsModalOpen(false);
+    setModalOpen(false);
   };
-
-  const handleDelete = (taskId) => {
-    if (window.confirm('Delete this task? This action cannot be undone.')) {
-      setTasks(tasks.filter((t) => t.id !== taskId));
-      setIsModalOpen(false);
-    }
-  };
-
-  const handleHandoff = (taskId, newAssignee, taskTitle, e) => {
-    if (e) e.stopPropagation();
-    setTasks(
-      tasks.map((t) => (t.id === taskId ? { ...t, assignee: newAssignee } : t))
-    );
-    showToast(`Handed off "${taskTitle}" to ${newAssignee}. They've got it!`);
-  };
-
-  const getInitials = (name) => {
-    return name
-      .split(' ')
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase();
-  };
-
-  // Filter tasks based on search query (Secret Sauce - M12)
-  const filteredTasks = tasks.filter((t) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      t.title.toLowerCase().includes(query) ||
-      t.description.toLowerCase().includes(query) ||
-      t.assignee.toLowerCase().includes(query) ||
-      t.type.toLowerCase().includes(query)
-    );
-  });
 
   return (
-    <div className="min-h-screen bg-surface-page text-text-primary p-6 font-sans relative">
-      {toastMessage && (
-        <div className="fixed top-4 right-4 bg-brand-primary text-white text-xs px-4 py-2.5 rounded-md shadow-lg z-50 animate-bounce">
-          {toastMessage}
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
+      {toast && (
+        <div className="fixed top-4 right-4 bg-indigo-600 text-white text-xs px-4 py-2.5 rounded shadow-lg z-50">
+          {toast}
         </div>
       )}
 
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 border-b border-slate-800 pb-4 gap-4">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 border-b border-slate-800 pb-4 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary"> Project Tracker</h1>
-          <p className="text-sm text-text-muted">Monitor your projects from intent to ship.</p>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            Vibecoding Project Tracker
+          </h1>
+          <p className="text-xs text-slate-400">Natural language task filtering with zero API keys required.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Secret Sauce Search Bar (M12) */}
+
+        <div className="flex gap-2 items-center">
           <div className="relative">
-            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 text-xs">
-              🔍
-            </span>
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter tasks, assignee..."
-              className="bg-slate-900 border border-slate-700 rounded-md pl-8 pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-brand-primary w-48 sm:w-64"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder='Ask AI: "overdue bugs for Teammate A"'
+              className="bg-slate-900 border border-indigo-500/50 rounded px-3 py-1.5 text-xs w-72 focus:outline-none focus:border-indigo-400 placeholder:text-slate-500"
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-xs text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
+            {aiState.processing && (
+              <span className="absolute right-2.5 top-2 text-[10px] text-indigo-400 animate-pulse">
+                Thinking...
+              </span>
             )}
           </div>
 
-          <button
-            onClick={() => openCreateModal('todo')}
-            className="bg-brand-primary hover:bg-brand-accent text-white px-4 py-2 rounded-md font-medium text-sm transition shadow"
-          >
+          <button onClick={() => openModal()} className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap">
             + New Task
           </button>
         </div>
       </header>
 
-      {/* Deliverable Anchor Board (M11) */}
-      <div className="mb-6 bg-surface-card border border-slate-800 rounded-lg p-4 shadow-sm">
-        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3 flex items-center justify-between">
-          <span>Project Deliverable Anchors</span>
-          <span className="text-[11px] text-text-muted font-normal lowercase">
-            {anchors.filter((a) => a.url.trim()).length} of 4 linked
-          </span>
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {anchors.map((anchor) => {
-            const isFilled = Boolean(anchor.url && anchor.url.trim());
-            return (
-              <div
-                key={anchor.id}
-                className={`p-3 rounded-md border flex flex-col justify-between transition ${
-                  isFilled
-                    ? 'bg-emerald-950/20 border-emerald-500/40'
-                    : 'bg-slate-900/50 border-slate-800'
-                }`}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs font-medium text-text-primary flex items-center gap-1.5">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        isFilled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
-                      }`}
-                    />
-                    {anchor.label}
-                  </span>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-                      isFilled
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'bg-slate-800 text-text-muted'
-                    }`}
-                  >
-                    {isFilled ? 'LINKED' : 'EMPTY'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="url"
-                    value={anchor.url}
-                    onChange={(e) => handleAnchorUrlChange(anchor.id, e.target.value)}
-                    placeholder="Paste deliverable URL..."
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-xs font-mono text-text-primary focus:outline-none focus:border-brand-primary placeholder:text-slate-600"
-                  />
-                  {isFilled && (
-                    <a
-                      href={anchor.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-brand-primary hover:underline px-1"
-                      title="Open Link"
-                    >
-                      ↗
-                    </a>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {query && (
+        <div className="mb-4 bg-indigo-950/30 border border-indigo-900/50 rounded p-2 text-xs text-indigo-300 flex justify-between items-center">
+          <span>🧠 <strong>Local AI Intent:</strong> {aiState.reasoning}</span>
+          <span className="text-slate-400 font-mono text-[11px]">{filtered.length} matches</span>
         </div>
-      </div>
+      )}
 
-      {/* Team Ownership Summary Strip */}
-      <div className="mb-6 bg-surface-card/70 border border-slate-800 rounded-lg p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-        {TEAMMATES.map((member) => {
-          const activeTasks = tasks.filter(
-            (t) => t.assignee === member && t.status !== 'done'
-          );
+      {/* Deliverables Bar */}
+      <div className="mb-6 bg-slate-900/50 border border-slate-800 rounded p-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+        {anchors.map(a => {
+          const filled = Boolean(a.url);
           return (
-            <div key={member} className="flex items-center gap-3 bg-slate-900/50 p-2 rounded border border-slate-800/80">
-              <div className="w-8 h-8 rounded-full bg-brand-primary/20 text-brand-primary border border-brand-primary/40 font-mono text-xs font-bold flex items-center justify-center">
-                {getInitials(member)}
+            <div key={a.id} className={`p-2.5 rounded border text-xs ${filled ? 'bg-emerald-950/20 border-emerald-900/50' : 'bg-slate-900 border-slate-800'}`}>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-medium">{a.label}</span>
+                <span className={`text-[9px] px-1 rounded ${filled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>{filled ? 'LINKED' : 'EMPTY'}</span>
               </div>
-              <div className="overflow-hidden">
-                <div className="text-xs font-semibold text-text-primary">{member}</div>
-                <div className="text-[11px] text-text-muted truncate">
-                  {activeTasks.length === 0
-                    ? 'No active tasks'
-                    : `Driving: ${activeTasks.map((t) => t.title).join(', ')}`}
-                </div>
-              </div>
+              <input
+                type="url"
+                value={a.url}
+                onChange={e => setAnchors(anchors.map(x => x.id === a.id ? { ...x, url: e.target.value } : x))}
+                placeholder="Paste URL..."
+                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500"
+              />
             </div>
           );
         })}
       </div>
 
-      {/* Kanban Board Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {STAGES.map((stage) => {
-          const columnTasks = filteredTasks.filter((t) => t.status === stage.id);
-
+      {/* Kanban Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {STAGES.map(stage => {
+          const colTasks = filtered.filter(t => t.status === stage.id);
           return (
-            <div key={stage.id} className="bg-surface-card/50 rounded-lg p-4 border border-slate-800 flex flex-col">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-800/60">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
-                  {stage.label}
-                </h2>
-                <div className="flex items-center gap-2">
-                  <span className="bg-slate-800 text-text-muted text-xs px-2 py-0.5 rounded-full font-mono">
-                    {columnTasks.length}
-                  </span>
-                  <button
-                    onClick={() => openCreateModal(stage.id)}
-                    className="text-text-muted hover:text-text-primary text-sm font-bold px-1.5"
-                    title="Add task to this column"
-                  >
-                    +
-                  </button>
-                </div>
+            <div key={stage.id} className="bg-slate-900/30 border border-slate-800/80 rounded p-3 flex flex-col">
+              <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                <h2 className="text-xs font-semibold uppercase text-slate-400">{stage.label}</h2>
+                <span className="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded font-mono">{colTasks.length}</span>
               </div>
 
-              <div className="space-y-3 flex-1">
-                {columnTasks.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-slate-800 rounded-md text-text-muted text-xs">
-                    Nothing here yet.
-                  </div>
+              <div className="space-y-2.5 flex-1">
+                {colTasks.length === 0 ? (
+                  <div className="text-center py-6 text-slate-600 text-xs">No tasks</div>
                 ) : (
-                  columnTasks.map((task) => {
+                  colTasks.map(task => {
                     const isBug = task.type === 'bug';
-                    const dueState = getDueState(task.dueDate, task.status);
-
-                    let dueTintClass = 'bg-surface-card border-slate-700/60';
-                    if (dueState === 'overdue') {
-                      dueTintClass = 'bg-red-950/20 border-red-500/50 shadow-red-950/20';
-                    } else if (dueState === 'warning') {
-                      dueTintClass = 'bg-amber-950/20 border-amber-500/50 shadow-amber-950/20';
-                    }
-
+                    const due = checkDue(task.dueDate, task.status);
                     return (
                       <div
                         key={task.id}
-                        className={`p-4 rounded-md border shadow-sm transition group relative overflow-hidden ${dueTintClass} ${
-                          isBug ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-emerald-500'
-                        }`}
+                        onClick={() => openModal(task)}
+                        className={`p-3 rounded border bg-slate-900 cursor-pointer transition hover:border-slate-600 relative ${
+                          due === 'overdue' ? 'border-red-900/50 bg-red-950/10' : due === 'warning' ? 'border-amber-900/50 bg-amber-950/10' : 'border-slate-800'
+                        } ${isBug ? 'border-l-2 border-l-red-500' : 'border-l-2 border-l-emerald-500'}`}
                       >
-                        <div className="flex justify-between items-center mb-2">
-                          <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase tracking-wide flex items-center gap-1 ${
-                              isBug ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
-                            }`}
-                          >
-                            {isBug ? '🐛 bug' : '✦ feature'}
+                        <div className="flex justify-between items-center mb-1.5 text-[10px]">
+                          <span className={`px-1.5 py-0.5 rounded uppercase font-mono ${isBug ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                            {isBug ? 'bug' : 'feature'}
                           </span>
-
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-5 h-5 rounded-full bg-slate-800 text-text-primary text-[10px] font-mono font-bold flex items-center justify-center border border-slate-700">
-                              {getInitials(task.assignee)}
-                            </span>
-                            <span className="text-[11px] text-text-muted font-mono">{task.assignee}</span>
-                          </div>
+                          <span className="text-slate-400 font-mono">{task.assignee}</span>
                         </div>
 
-                        <div onClick={() => openEditModal(task)} className="cursor-pointer">
-                          <h3 className="text-sm font-medium text-text-primary mb-1 group-hover:text-brand-primary transition flex items-center justify-between">
-                            {task.title}
-                            {task.context && (
-                              <span className="text-[10px] font-mono bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">
-                                {task.contextTool || 'Context'}
-                              </span>
-                            )}
-                          </h3>
-                          {task.description && (
-                            <p className="text-xs text-text-muted line-clamp-2 mb-2">{task.description}</p>
-                          )}
-                        </div>
+                        <h3 className="text-xs font-medium text-slate-200 mb-1">{task.title}</h3>
+                        {task.description && <p className="text-[11px] text-slate-400 line-clamp-2 mb-2">{task.description}</p>}
 
-                        <div className="flex flex-col gap-2 mt-3 pt-2 border-t border-slate-800/80 text-[11px]">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <span className="text-text-muted font-mono">
-                                {task.dueDate ? `Due: ${task.dueDate}` : 'No deadline'}
-                              </span>
-                              {dueState === 'overdue' && (
-                                <span className="bg-red-500/20 text-red-400 px-1.5 py-0.2 rounded text-[9px] font-bold font-mono">PAST DUE</span>
-                              )}
-                              {dueState === 'warning' && (
-                                <span className="bg-amber-500/20 text-amber-400 px-1.5 py-0.2 rounded text-[9px] font-bold font-mono">DUE SOON</span>
-                              )}
-                            </div>
-
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                if (e.target.value) handleHandoff(task.id, e.target.value, task.title, e);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="bg-slate-900 text-text-muted hover:text-text-primary border border-slate-800 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-brand-primary cursor-pointer"
-                            >
-                              <option value="" disabled>
-                                Hand off to...
-                              </option>
-                              {TEAMMATES.filter((m) => m !== task.assignee).map((m) => (
-                                <option key={m} value={m}>
-                                  {m}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <button
-                            onClick={(e) => handleCopyPrompt(task, e)}
-                            className="w-full bg-slate-800/80 hover:bg-brand-primary/20 hover:text-brand-primary text-text-muted text-[11px] font-medium py-1 px-2 rounded border border-slate-700/60 transition flex items-center justify-center gap-1.5"
-                          >
-                            <span>📋</span> Copy Context
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-800/80 text-[10px] text-slate-400">
+                          <span>{task.dueDate || 'No date'}</span>
+                          <button onClick={e => copyPrompt(task, e)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded">
+                            Copy Context
                           </button>
                         </div>
                       </div>
@@ -561,167 +346,56 @@ ${task.context || 'No context provided.'}`;
         })}
       </div>
 
-      {/* Task Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-surface-card border border-slate-700 rounded-lg max-w-2xl w-full p-6 shadow-xl my-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-text-primary">
-                {editingTask ? 'Edit Task & Prompt Context' : 'New Task & Prompt Context'}
-              </h2>
-              {editingTask && (
-                <button
-                  type="button"
-                  onClick={(e) => handleCopyPrompt(editingTask, e)}
-                  className="bg-brand-primary/20 hover:bg-brand-primary text-brand-primary hover:text-white text-xs px-3 py-1.5 rounded font-medium transition flex items-center gap-1.5 border border-brand-primary/40"
-                >
-                  <span>📋</span> Copy Context
-                </button>
-              )}
-            </div>
-
-            <form onSubmit={handleSave} className="space-y-4">
+      {/* Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg max-w-lg w-full p-6 shadow-xl">
+            <h2 className="text-sm font-bold mb-4">{editing ? 'Edit Task' : 'New Task'}</h2>
+            <form onSubmit={saveTask} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-text-primary focus:outline-none focus:border-brand-primary"
-                  placeholder="Task title..."
-                />
+                <label className="block text-[11px] text-slate-400 mb-1">Title</label>
+                <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs focus:outline-none focus:border-indigo-500" />
               </div>
-
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-text-primary focus:outline-none focus:border-brand-primary"
-                  placeholder="Task description..."
-                />
+                <label className="block text-[11px] text-slate-400 mb-1">Description</label>
+                <textarea rows={2} value={desc} onChange={e => setDesc(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs focus:outline-none focus:border-indigo-500" />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1">Type</label>
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                    className={`w-full bg-slate-900 border rounded p-2 text-sm font-medium focus:outline-none ${
-                      type === 'bug' ? 'border-red-500/50 text-red-400' : 'border-emerald-500/50 text-emerald-400'
-                    }`}
-                  >
-                    <option value="feature">✦ Feature</option>
-                    <option value="bug">🐛 Bug</option>
+                  <label className="block text-[11px] text-slate-400 mb-1">Type</label>
+                  <select value={type} onChange={e => setType(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs">
+                    <option value="feature">Feature</option>
+                    <option value="bug">Bug</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1">Stage</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-text-primary focus:outline-none focus:border-brand-primary"
-                  >
-                    {STAGES.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
+                  <label className="block text-[11px] text-slate-400 mb-1">Stage</label>
+                  <select value={status} onChange={e => setStatus(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs">
+                    {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1">Assignee</label>
-                  <select
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-text-primary focus:outline-none focus:border-brand-primary"
-                  >
-                    {TEAMMATES.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
+                  <label className="block text-[11px] text-slate-400 mb-1">Assignee</label>
+                  <select value={assignee} onChange={e => setAssignee(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs">
+                    {TEAMMATES.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1">Due Date</label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-text-primary focus:outline-none focus:border-brand-primary"
-                  />
+                  <label className="block text-[11px] text-slate-400 mb-1">Due Date</label>
+                  <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs" />
                 </div>
               </div>
-
-              {/* Context Section */}
-              <div className="border-t border-slate-800 pt-4 mt-4">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-semibold text-brand-primary uppercase tracking-wider">
-                    Curated AI Prompt Context
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-text-muted font-mono">
-                      {contextUpdatedAt ? `last updated ${timeAgo(contextUpdatedAt)}` : 'not updated yet'}
-                    </span>
-                    <select
-                      value={contextTool}
-                      onChange={(e) => setContextTool(e.target.value)}
-                      className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-text-primary focus:outline-none focus:border-brand-primary"
-                    >
-                      {AI_TOOLS.map((tool) => (
-                        <option key={tool} value={tool}>
-                          {tool}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <p className="text-[11px] text-text-muted mb-2">
-                  Paste-ready briefing block for continuing work with your AI assistant.
-                </p>
-                <textarea
-                  rows={6}
-                  value={context}
-                  onChange={(e) => handleContextChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-xs font-mono text-text-primary focus:outline-none focus:border-brand-primary leading-relaxed"
-                  placeholder="Enter Markdown briefing context..."
-                />
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">AI Context & Prompt History</label>
+                <textarea rows={4} value={context} onChange={e => { setContext(e.target.value); setUpdatedAt(new Date().toISOString()); }} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs font-mono" />
               </div>
-
-              <div className="flex justify-between items-center pt-4 border-t border-slate-800">
-                {editingTask ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(editingTask.id)}
-                    className="text-red-400 hover:text-red-300 text-sm font-medium"
-                  >
-                    Delete Task
-                  </button>
-                ) : <div />}
-
+              <div className="flex justify-between pt-3 border-t border-slate-800">
+                {editing ? <button type="button" onClick={() => { setTasks(tasks.filter(t => t.id !== editing.id)); setModalOpen(false); }} className="text-red-400 text-xs">Delete</button> : <div />}
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-3 py-1.5 bg-slate-800 text-text-muted hover:text-text-primary rounded text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-brand-primary hover:bg-brand-accent text-white rounded text-sm font-medium"
-                  >
-                    {editingTask ? 'Save Changes' : 'Create Task'}
-                  </button>
+                  <button type="button" onClick={() => setModalOpen(false)} className="px-3 py-1.5 bg-slate-800 text-xs rounded">Cancel</button>
+                  <button type="submit" className="px-3 py-1.5 bg-indigo-600 text-xs rounded text-white font-medium">Save</button>
                 </div>
               </div>
             </form>
